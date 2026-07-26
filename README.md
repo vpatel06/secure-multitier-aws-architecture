@@ -80,3 +80,10 @@ AWS (VPC, EC2, Auto Scaling, RDS/Postgres, IAM, Systems Manager, NAT Gateway, VP
 ## Teardown
 
 Everything here was built and torn down in the same sitting to avoid leaving anything running and racking up cost — NAT Gateway and Elastic IP first (most expensive), then the ASG, RDS, VPC endpoints, security groups, route tables, IGW, subnets, and finally the VPC itself. Double-checked with the AWS CLI afterward that nothing was left behind.
+
+## Notes
+
+The Flask API layer was scaffolded with AI assistance since the focus of this
+project was the AWS architecture, not the application code. I designed, built,
+debugged, and tore down the entire infrastructure manually through the AWS
+console.
