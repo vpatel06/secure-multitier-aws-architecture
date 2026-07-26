@@ -69,95 +69,95 @@ AWS (VPC, EC2, Auto Scaling, RDS/Postgres, IAM, Systems Manager, NAT Gateway, VP
 
 ### Getting the app running locally first (Phase 0, before touching AWS)
 
-![Local setup](screenshots/Screenshot%202026-07-12%20at%202.08.44%20PM.png)
+![Local setup](screenshots/Screenshot-2026-07-12-at-2.08.44-PM.png)
 Set up the project folder, virtual environment, and installed dependencies — got this working end-to-end on SQLite before deploying anything to AWS.
 
-![Flask dev server running](screenshots/Screenshot%202026-07-12%20at%202.11.08%20PM.png)
+![Flask dev server running](screenshots/Screenshot-2026-07-12-at-2.11.08-PM.png)
 Local dev server up and responding.
 
-![Local health check and first POST](screenshots/Screenshot%202026-07-12%20at%202.11.51%20PM.png)
+![Local health check and first POST](screenshots/Screenshot-2026-07-12-at-2.11.51-PM.png)
 Health check confirms the app can talk to its database, then created the first test application through the API.
 
-![Local GET and stats endpoints](screenshots/Screenshot%202026-07-12%20at%202.11.57%20PM.png)
+![Local GET and stats endpoints](screenshots/Screenshot-2026-07-12-at-2.11.57-PM.png)
 Confirmed listing and stats endpoints work before moving to AWS.
 
 ### The actual AWS network
 
-![VPC overview](screenshots/Screenshot%202026-07-12%20at%204.41.37%20PM.png)
+![VPC overview](screenshots/Screenshot-2026-07-12-at-4.41.37-PM.png)
 The VPC itself — `tracker-vpc`, `10.0.0.0/16`.
 
-![Subnets](screenshots/Screenshot%202026-07-12%20at%204.41.31%20PM.png)
+![Subnets](screenshots/Screenshot-2026-07-12-at-4.41.31-PM.png)
 All 4 subnets: public, two private app subnets split across `us-east-1a`/`us-east-1b`, and the isolated database subnet.
 
-![VPC details](screenshots/Screenshot%202026-07-12%20at%209.17.31%20PM.png)
+![VPC details](screenshots/Screenshot-2026-07-12-at-9.17.31-PM.png)
 Full VPC configuration — DNS resolution and hostnames enabled (needed for the VPC endpoints to work).
 
 ### Routing
 
-![Public route table](screenshots/Screenshot%202026-07-12%20at%209.17.56%20PM.png)
+![Public route table](screenshots/Screenshot-2026-07-12-at-9.17.56-PM.png)
 Public route table, associated with the public subnet only.
 
-![Private route table](screenshots/Screenshot%202026-07-12%20at%209.18.06%20PM.png)
+![Private route table](screenshots/Screenshot-2026-07-12-at-9.18.06-PM.png)
 Private route table, associated with both app subnets.
 
-![Public route table routes](screenshots/Screenshot%202026-07-12%20at%209.18.40%20PM.png)
+![Public route table routes](screenshots/Screenshot-2026-07-12-at-9.18.40-PM.png)
 The public route table's actual route: `0.0.0.0/0` → Internet Gateway.
 
-![Private route table routes](screenshots/Screenshot%202026-07-12%20at%209.18.25%20PM.png)
+![Private route table routes](screenshots/Screenshot-2026-07-12-at-9.18.25-PM.png)
 The private route table's actual route: `0.0.0.0/0` → NAT Gateway. This is what lets the app tier reach the internet for package installs without being reachable from it.
 
-![Internet Gateway](screenshots/Screenshot%202026-07-12%20at%209.18.57%20PM.png)
+![Internet Gateway](screenshots/Screenshot-2026-07-12-at-9.18.57-PM.png)
 Internet Gateway attached to the VPC.
 
-![NAT Gateway](screenshots/Screenshot%202026-07-12%20at%209.19.06%20PM.png)
+![NAT Gateway](screenshots/Screenshot-2026-07-12-at-9.19.06-PM.png)
 NAT Gateway, sitting in the public subnet, is the only thing giving the private subnets outbound access.
 
-![Elastic IP](screenshots/Screenshot%202026-07-12%20at%209.19.21%20PM.png)
+![Elastic IP](screenshots/Screenshot-2026-07-12-at-9.19.21-PM.png)
 The Elastic IP tied to the NAT Gateway.
 
 ### Security groups — the actual access control
 
-![App tier security group](screenshots/Screenshot%202026-07-12%20at%209.19.38%20PM.png)
+![App tier security group](screenshots/Screenshot-2026-07-12-at-9.19.38-PM.png)
 `secg-app` — App tier, SSM access only. No SSH rule exists here at all.
 
-![DB tier security group](screenshots/Screenshot%202026-07-12%20at%209.19.45%20PM.png)
+![DB tier security group](screenshots/Screenshot-2026-07-12-at-9.19.45-PM.png)
 `secg-db` — DB tier, only accepts traffic from the app tier's security group specifically, not a CIDR range.
 
-![Security group rule detail — db tier](screenshots/Screenshot%202026-07-12%20at%209.19.58%20PM.png)
+![Security group rule detail — db tier](screenshots/Screenshot-2026-07-12-at-9.19.58-PM.png)
 The actual rule on `secg-db`: PostgreSQL, port 5432, source is `secg-app` specifically — not a CIDR block, not "anywhere."
 
 ### Compute and database configuration
 
-![Launch template](screenshots/Screenshot%202026-07-12%20at%209.20.29%20PM.png)
+![Launch template](screenshots/Screenshot-2026-07-12-at-9.20.29-PM.png)
 The launch template — `t3.micro`, the AMI, and the app-tier security group attached.
 
-![Auto Scaling group overview](screenshots/Screenshot%202026-07-12%20at%209.20.05%20PM.png)
+![Auto Scaling group overview](screenshots/Screenshot-2026-07-12-at-9.20.05-PM.png)
 `tracker-asg` — 1/1 healthy, spanning both `us-east-1a` and `us-east-1b`.
 
-![Auto Scaling group network config](screenshots/Screenshot%202026-07-12%20at%209.21.02%20PM.png)
+![Auto Scaling group network config](screenshots/Screenshot-2026-07-12-at-9.21.02-PM.png)
 The ASG's actual network config, confirming it's tied to both private app subnets — this is what makes it genuinely multi-AZ instead of just claiming to be.
 
-![EC2 instance detail](screenshots/Screenshot%202026-07-12%20at%209.21.27%20PM.png)
+![EC2 instance detail](screenshots/Screenshot-2026-07-12-at-9.21.27-PM.png)
 The running instance itself — private IP only, no public IPv4, IAM role attached, tied back to the ASG.
 
-![IAM role scoped to SSM only](screenshots/Screenshot%202026-07-12%20at%209.21.40%20PM.png)
+![IAM role scoped to SSM only](screenshots/Screenshot-2026-07-12-at-9.21.40-PM.png)
 `tracker-ec2-role` — exactly one permission policy attached: `AmazonSSMManagedInstanceCore`. Nothing else. This is the actual enforcement behind "no SSH, least privilege."
 
-![RDS connectivity and security](screenshots/Screenshot%202026-07-12%20at%209.29.04%20PM.png)
+![RDS connectivity and security](screenshots/Screenshot-2026-07-12-at-9.29.04-PM.png)
 RDS connectivity config — no public endpoint, security group locked to `secg-db`, IAM DB auth intentionally left off since Systems Manager handles access control at the network layer instead.
 
-![RDS configuration detail](screenshots/Screenshot%202026-07-12%20at%209.31.04%20PM.png)
+![RDS configuration detail](screenshots/Screenshot-2026-07-12-at-9.31.04-PM.png)
 Full instance configuration — `db.t3.micro`, PostgreSQL, single-AZ (the documented cost/availability tradeoff), 20 GiB storage.
 
 ### Proof it actually works (and that it's actually isolated)
 
-![SSM session, real data](screenshots/Screenshot%202026-07-12%20at%206.36.52%20PM.png)
+![SSM session, real data](screenshots/Screenshot-2026-07-12-at-6.36.52-PM.png)
 Connected through Session Manager (no SSH), started the app pointed at RDS, health check confirms the database connection, then added and retrieved a real application through the API — the intended path works end to end.
 
-![External request to app tier — blocked](screenshots/Screenshot%202026-07-12%20at%206.37.46%20PM.png)
+![External request to app tier — blocked](screenshots/Screenshot-2026-07-12-at-6.37.46-PM.png)
 From my own laptop, outside the VPC entirely, trying to hit the app tier directly times out. This is the proof that isolation isn't just theoretical — it's the single most important screenshot in this whole project.
 
-![External request to RDS — blocked](screenshots/Screenshot%202026-07-12%20at%206.39.35%20PM.png)
+![External request to RDS — blocked](screenshots/Screenshot-2026-07-12-at-6.39.35-PM.png)
 Same test against the database directly — connection refused.
 
 ## Teardown
